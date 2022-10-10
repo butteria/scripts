@@ -64,6 +64,7 @@ function bilibili_cv_search() {
     # titles without html tag.
     echo "${pages[0]} search results found."
     choose=`echo $res | jq -r '.data.result[].title' | sed 's/<[^>]*>//g' | dmenu -ix -fn "JetBrainsMono" -l 15 -c -p "results?"`
+    [[ $? != 0 ]] && { echo "dmenu selection abort by user."; exit 1; }
     mid=( `echo $res | jq -r ".data.result[$choose].media_id"` )
     
     # use mdid to get more info.
@@ -78,24 +79,46 @@ function bilibili_cv_search() {
     bilibili_cv $ssid
 }
 
-
 # usage: mpvbili.sh --cv [seasonid] 
 function bilibili_cv() {
-    # get anime epid and title.
-    index=`curl -sG 'http://api.bilibili.com/pgc/view/web/season' --data-urlencode "season_id=$1" \
-        | jq -r '.result.episodes[] | "\(.share_copy) \(.badge_info.text)"' | dmenu -ix -fn "JetBrainsMono" -l 15 -c -p "episode?"`
-    epidbase=`curl -sG 'http://api.bilibili.com/pgc/view/web/season' --data-urlencode "season_id=$1" \
+    # get season info.
+    season_info=`curl -sG 'http://api.bilibili.com/pgc/view/web/season' \
+        --data-urlencode "season_id=$1"`
+    message=`echo $season_info | jq -r '.message'`
+    [[ "$message" != "success" ]] && { echo "$message"; exit 1; }
+
+    # choose video.
+    index=`echo $season_info \
+        | jq -r '.result.episodes[] | "\(.share_copy) \(.badge_info.text)"' \
+        | dmenu -ix -fn "JetBrainsMono" -l 15 -c -p "episode?"`
+    [[ $? != 0 ]] && { echo "dmenu selection abort by user."; exit 1; }
+    
+    # get cid for .danmu and epid for video real url.
+    cid=`echo $season_info | jq -r ".result.episodes[$index].cid"`
+    epidbase=`curl -sG 'http://api.bilibili.com/pgc/view/web/season' \
+        --data-urlencode "season_id=$1" \
         | jq '.result.episodes[0].id'`
     epid=$( expr $epidbase + $index )
 
     # try to get real url.
-    res=`curl -sG 'https://api.bilibili.com/pgc/player/web/playurl' --data-urlencode "ep_id=$epid" --data-urlencode 'qn=64'`
-    message=`echo $res | jq -r '.message'`
+    playlists_info=`curl -sG 'https://api.bilibili.com/pgc/player/web/playurl' \
+        --data-urlencode "ep_id=$epid" \
+        --data-urlencode 'qn=64'`
+    message=`echo $playlists_info | jq -r '.message'`
     [[ "$message" != "success" ]] && { echo "$message"; exit 1; }
-    url=`echo $res | jq -r '.result.durl[0].url'`
+    url=`echo $playlists_info | jq -r '.result.durl[0].url'`
     
+    # get danmu.
+    danmu_ass="$CACHE_DIR/$cid.danmu.ass"
+    danmu_xml="$CACHE_DIR/$cid.danmu.xml"
+    ./danmu.sh $cid $danmu_xml
+    ./danmaku2ass.py -o $danmu_ass -s 1920x1080 -fn "Stolzl book" \
+        -fs 48 -a 0.8 -dm 10 -ds 10 $danmu_xml
     # run mpv.
-    mpv $url
+    mpv --sub-file="$danmu_ass" $url
+
+    # rm danmu locally.
+    rm -f "$danmu_ass" "$danmu_xml"
 }
 
 case $1 in
