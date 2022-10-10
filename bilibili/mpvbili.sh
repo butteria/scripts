@@ -1,10 +1,11 @@
+# bilibili api details on https://github.com/SocialSisterYi/bilibili-API-collect.
 CACHE_DIR=$HOME/.cache/bilibili
 [ ! -d $CACHE_DIR ] && { mkdir $CACHE_DIR; }
 
 # requirements:
 # you need mpv and lrc.lua to show danmaku on mpv screen.
 # use danmu.js to receive danmu from bilibili.
-# usage:    mpv_bili.sh --live [id]
+# usage:    mpvbili.sh --live [id]
 function bilibili_live() {
     # fetch roomid
     json=$(curl -sG "https://api.live.bilibili.com/room/v1/Room/room_init" --data-urlencode "id="$1)
@@ -25,7 +26,8 @@ function bilibili_live() {
     echo "" > $danmufile
 }
 
-# use yt-dlp to download .xml and convert it to .ass by danmaku2ass.
+# use yt-dlp to download .xml and convert it to .ass by danmaku2ass.py.
+# usage:    mpvbili.sh --bv [id]
 function bilibili_bv() {
     log=$CACHE_DIR/bilibili_bv.log
 
@@ -38,7 +40,7 @@ function bilibili_bv() {
     [ $? -ne 0 ] && { echo "something goes wrong. please check the error file."; exit 1; }
 
     # convert xml to ass file.
-    danmaku2ass -o $ass -s 1920x1080 -fn "Stolzl book" -fs 48 -a 0.8 -dm 10 -ds 10 $xml
+    ./danmaku2ass.py -o $ass -s 1920x1080 -fn "Stolzl book" -fs 48 -a 0.8 -dm 10 -ds 10 $xml
 
     # start mpv with yt-dlp hook.
     mpv $1 --sub-file=$ass
@@ -47,7 +49,58 @@ function bilibili_bv() {
     rm -f $xml $ass $log
 }
 
+function bilibili_cv_search() {
+    # get cookies.
+    cookies=`cat ./cookies`
+    res=`curl -sG 'http://api.bilibili.com/x/web-interface/search/type' \
+        --data-urlencode 'search_type=media_bangumi' \
+        --data-urlencode "keyword=$1" \
+        -b "SESSDATA=$cookies"`
+    message=`echo $res | jq -r '.message'`
+    [[ "$message" != "0" ]] && { echo "$message"; exit 1; }
+
+    pages=( `echo $res | jq -r '.data | "\(.numResults) \(.numPages)"'` )
+
+    # titles without html tag.
+    echo "${pages[0]} search results found."
+    choose=`echo $res | jq -r '.data.result[].title' | sed 's/<[^>]*>//g' | dmenu -ix -fn "JetBrainsMono" -l 15 -c -p "results?"`
+    mid=( `echo $res | jq -r ".data.result[$choose].media_id"` )
+    
+    # use mdid to get more info.
+    detailres=`curl -sG 'http://api.bilibili.com/pgc/review/user' \
+        --data-urlencode "media_id=$mid" \
+        -b "SESSDATA=$cookies"`
+    message=`echo $detailres | jq -r '.message'`
+    [[ "$message" != "success" ]] && { echo "$message"; exit 1; }
+    ssid=`echo $detailres | jq -r '.result.media.season_id'`
+
+    # run bilibili_cv func.
+    bilibili_cv $ssid
+}
+
+
+# usage: mpvbili.sh --cv [seasonid] 
+function bilibili_cv() {
+    # get anime epid and title.
+    index=`curl -sG 'http://api.bilibili.com/pgc/view/web/season' --data-urlencode "season_id=$1" \
+        | jq -r '.result.episodes[] | "\(.share_copy) \(.badge_info.text)"' | dmenu -ix -fn "JetBrainsMono" -l 15 -c -p "episode?"`
+    epidbase=`curl -sG 'http://api.bilibili.com/pgc/view/web/season' --data-urlencode "season_id=$1" \
+        | jq '.result.episodes[0].id'`
+    epid=$( expr $epidbase + $index )
+
+    # try to get real url.
+    res=`curl -sG 'https://api.bilibili.com/pgc/player/web/playurl' --data-urlencode "ep_id=$epid" --data-urlencode 'qn=64'`
+    message=`echo $res | jq -r '.message'`
+    [[ "$message" != "success" ]] && { echo "$message"; exit 1; }
+    url=`echo $res | jq -r '.result.durl[0].url'`
+    
+    # run mpv.
+    mpv $url
+}
+
 case $1 in
-"--live") bilibili_live $2 ;;
-"--bv")   bilibili_bv   $2 ;;
+    "--live") bilibili_live $2 ;;
+    "--bv")   bilibili_bv   $2 ;;
+    "--cv")   bilibili_cv   $2 ;;
+    "--cvsearch")   bilibili_cv_search $2;;
 esac
