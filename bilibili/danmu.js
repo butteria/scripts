@@ -1,8 +1,13 @@
-var brotli = require('brotli');
-var WebSocket = require('ws');
+try {
+    var brotli = require('brotli');
+    var websocket = require('ws');
+} catch (ex) {
+    console.log(ex);
+    return 1;
+}
 
 const args = process.argv.slice(2);
-const ws = new WebSocket('wss://broadcastlv.chat.bilibili.com:443/sub');
+const ws = new websocket('wss://broadcastlv.chat.bilibili.com:443/sub');
 var certification = {
     "uid":0,
     "roomid":parseInt(args[0]),
