@@ -1,6 +1,8 @@
 #! /bin/sh
 DANMU_LIVE_LOG="$CACHE_DIR/live.txt"
 DANMU_LIVE_JS="./danmu.js"
+DANMU_FONT=""
+
 
 function xml2ass {
     local xml="$1"
