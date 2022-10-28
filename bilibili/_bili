@@ -1,0 +1,39 @@
+#compdef bili
+
+_bili() {
+    local line state
+    _arguments -C "1: :->cmds" "*::arg:->args"
+
+    case "$state" in
+        cmds)
+            _values "bili sub commands." \
+                "search[search keyword]" \
+                "watch[watch video]" \
+                "download[download video]"
+            ;;
+        args)
+            case $line[1] in
+                search)     _bili_search   ;;
+                watch)      _bili_watch    ;;
+                download)   _bili_download ;;
+            esac
+            ;;
+    esac
+}
+
+_bili_search() {
+   _arguments -s \
+       "(-k --keyword)"{-k,--keyword=}'[keyword]'
+}
+
+_bili_watch() {
+    local method="--cid --url --sid --mid"
+   _arguments -S \
+       "($method)"--url='[webpage url]' \
+       "($method)"--cid='[video cid]' \
+       "($method)"--sid='[video sid]' \
+       "($method)"--mid='[video mid]' \
+}
+_bili_download() {
+
+}

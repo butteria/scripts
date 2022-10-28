@@ -1,0 +1,25 @@
+#! /bin/sh
+
+source ./opts2map.sh
+declare -A map
+declare -a args=("${@}")
+declare -a ret
+ret=( $(opts2map args map) )
+subcmd=${ret[0]}
+
+case $subcmd in
+    search)
+        ;;
+    watch)
+        ;;
+    download)
+        ;;
+    *)
+        # interactive mode using fzf.
+        INITIAL_QUERY=""
+        SHELL_COMMAND="./suggestions.sh "
+        FZF_DEFAULT_COMMAND="$SHELL_COMMAND '$INITIAL_QUERY'" \
+            fzf --header=$'Press CTRL-R to search from bilibili.\n\n' \
+            --bind "ctrl-r:reload:$SHELL_COMMAND {q} || true" \
+            --ansi --disabled --query "$INITIAL_QUERY"
+esac

@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# map args, return non-optional args.
+# map args and return non-optional args.
 function opts2map {
     local -n REF_ARGS="$1"
     local -n REF_MAP="$2"
