@@ -1,15 +1,19 @@
 #! /bin/sh
 
-# map args and return non-optional args.
 function opts2map {
     local -n REF_ARGS="$1"
     local -n REF_MAP="$2"
+    local k=0
     for ((i = 0; i < ${#REF_ARGS[@]}; i++)); do
         local key="${REF_ARGS[$i]}"
         local val=true
 
         # check if it is key.
-        [[ "$key" =~ ^(\-.*) ]] || { echo "$key"; continue; }
+        [[ "$key" =~ ^(\-.*) ]] || {
+            map[$k]="$key";
+            (($k+1));
+            continue;
+        }
         if [[ "$key" == *=* ]]; then
             <<<"$key" \
                 IFS='=' read key val

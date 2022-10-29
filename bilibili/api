@@ -1,0 +1,3 @@
+SEARCH_DEFAULT_API:https://api.bilibili.com/x/web-interface/search/default
+SEARCH_HOTSPOT_API:https://api.bilibili.com/x/web-interface/search/square
+SEARCH_KEYWORD_API:https://s.search.bilibili.com/main/suggest

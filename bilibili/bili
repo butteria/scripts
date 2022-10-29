@@ -3,12 +3,8 @@
 source ./opts2map.sh
 declare -A map
 declare -a args=("${@}")
-declare -a ret
-ret=( $(opts2map args map) )
-subcmd=${ret[0]}
-echo $args
-echo $ret
-echo ${map["--type"]}
+opts2map args map
+subcmd=${map[0]}
 
 case $subcmd in
     search)
@@ -20,7 +16,7 @@ case $subcmd in
     *)
         # interactive mode using fzf.
         INITIAL_QUERY=""
-        SHELL_COMMAND="./suggestions.sh $map["type"] "
+        SHELL_COMMAND="./suggestions.sh ${map["type"]} "
         FZF_DEFAULT_COMMAND="$SHELL_COMMAND '$INITIAL_QUERY'" \
             fzf --ansi \
                 --bind "change:reload:$SHELL_COMMAND {q} || true" \

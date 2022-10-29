@@ -1,0 +1,73 @@
+#! /bin/bash
+
+# map args.
+source ./opts2map.sh
+declare -A map
+declare -a args=("${@}")
+opts2map args map
+keyword="${map[0]}"
+search_type="${map["search-type"]}"
+
+SEARCH_DEFAULT_API="$(cat ./api | grep SEARCH_DEFAULT_API | cut -d ":" -f2,3)"
+SEARCH_HOTSPOT_API="$(cat ./api | grep SEARCH_HOTSPOT_API | cut -d ":" -f2,3)"
+SEARCH_KEYWORD_API="$(cat ./api | grep SEARCH_KEYWORD_API | cut -d ":" -f2,3)"
+
+# config.
+DEFAULT_SEARCH_TYPE="video"
+DEFAULT_HOTSPOT_NUMS=10
+
+function FEATCH_FROM_API() {
+    #param:  API, JQ_PARSE_EXPR, args...
+    cmd="curl -sG $1"
+    for i in "${@:3}"; do
+        cmd="$cmd --data-urlencode \"$i\" "
+    done
+
+    result="$(eval $cmd)"
+    message="$(echo "$result" | jq '.message')"
+    [[ "$message" == "0" ]] && {
+        echo "$0: line ${LINENO[0]}: $message." >&2;
+        exit 1
+    } || {
+        echo -e "$(echo "$result" | jq -r "$2")"
+    }
+    exit 0
+}
+
+# search_type empty.
+if [ -z "$search_type" ] ; then
+    search_type="$DEFAULT_SEARCH_TYPE"
+fi
+# if keyword is empty, search default and hotspot news.
+if [ -z "$keyword" ] ; then
+    # default search.
+    __default="$( \
+        FEATCH_FROM_API \
+        "$SEARCH_DEFAULT_API" \
+        ".data.show_name"
+    )"
+
+    # hotsot news.
+    __hotspot="$( \
+        FEATCH_FROM_API \
+        "$SEARCH_HOTSPOT_API" \
+        ".data.trending.list[].show_name" \
+        "limit=$DEFAULT_HOTSPOT_NUMS"
+    )"
+    echo -e "$__default"
+    echo -e "$__hotspot"
+    exit 0
+fi
+
+# search keyword.
+__search="$( \
+    FEATCH_FROM_API \
+    "$SEARCH_KEYWORD_API" \
+    ".result.tag[].value" \
+    "type=$search_type" \
+    "term=$keyword" \
+    "main_ver=v1"
+)"
+echo -e "$__search"
+
+exit 0
