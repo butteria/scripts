@@ -6,6 +6,9 @@ declare -a args=("${@}")
 declare -a ret
 ret=( $(opts2map args map) )
 subcmd=${ret[0]}
+echo $args
+echo $ret
+echo ${map["--type"]}
 
 case $subcmd in
     search)
@@ -17,9 +20,9 @@ case $subcmd in
     *)
         # interactive mode using fzf.
         INITIAL_QUERY=""
-        SHELL_COMMAND="./suggestions.sh "
+        SHELL_COMMAND="./suggestions.sh $map["type"] "
         FZF_DEFAULT_COMMAND="$SHELL_COMMAND '$INITIAL_QUERY'" \
-            fzf --header=$'Press CTRL-R to search from bilibili.\n\n' \
-            --bind "ctrl-r:reload:$SHELL_COMMAND {q} || true" \
-            --ansi --disabled --query "$INITIAL_QUERY"
+            fzf --ansi \
+                --bind "change:reload:$SHELL_COMMAND {q} || true" \
+                --disabled --query "$INITIAL_QUERY"
 esac
