@@ -1,66 +1,50 @@
 #! /bin/bash
 
 source ./opts2map.sh
+source ./api.sh
 declare -A map
 declare -a args=("${@}")
 opts2map args map
 keyword="${map[0]}"
-suggestion_type="${map["type"]}"
 
-SEARCH_DEFAULT_API="$(cat ./api | grep SEARCH_DEFAULT_API | cut -d ":" -f2,3)"
-SEARCH_HOTSPOT_API="$(cat ./api | grep SEARCH_HOTSPOT_API | cut -d ":" -f2,3)"
-SEARCH_KEYWORD_API="$(cat ./api | grep SEARCH_KEYWORD_API | cut -d ":" -f2,3)"
-DEFAULT_HOTSPOT_NUMS=10
+SUGGESTIONS_DEFAULT_API="$(cat ./api | grep SUGGESTIONS_DEFAULT_API | cut -d ":" -f2,3)"
+SUGGESTIONS_HOTSPOT_API="$(cat ./api | grep SUGGESTIONS_HOTSPOT_API | cut -d ":" -f2,3)"
+SUGGESTIONS_KEYWORD_API="$(cat ./api | grep SUGGESTIONS_KEYWORD_API | cut -d ":" -f2,3)"
 
-function FEATCH_FROM_API() {
-    #param:  API, JQ_PARSE_EXPR, args...
-    cmd="curl -sG $1"
-    for i in "${@:3}"; do
-        cmd="$cmd --data-urlencode \"$i\" "
-    done
-
-    result="$(eval $cmd)"
-    message="$(echo "$result" | jq '.message')"
-    [[ "$message" == "0" ]] && {
-        echo "$0: line ${LINENO[0]}: $message." >&2;
-        exit 1
-    } || {
-        echo -e "$(echo "$result" | jq -r "$2")"
+[ ! -z "${map["hotspot"]}" ] && {
+    # hotspot suggestions.
+    HOTSPOT_NUMS=10
+    [[ "${map["hotspot"]}" != "true" ]] && {
+        HOTSPOT_NUMS="${map["hotspot"]}"
     }
-    exit 0
+    __hotspot="$( \
+        FETCH_FROM_API \
+        "$SUGGESTIONS_HOTSPOT_API" \
+        ".data.trending.list[].show_name" \
+        "NULL" \
+        "limit=$HOTSPOT_NUMS"
+    )"
+    echo -e "$__hotspot"
+} || {
+    # default suggestions.
+    [ -z "$keyword" ] && {
+        __default="$( \
+            FETCH_FROM_API \
+            "$SUGGESTIONS_DEFAULT_API" \
+            ".data.show_name" \
+            "NULL"
+        )"
+        echo -e "$__default"
+    } || {
+    # keyword suggestions.
+        __search="$( \
+            FETCH_FROM_API \
+            "$SUGGESTIONS_KEYWORD_API" \
+            ".result.tag[].value" \
+            "NULL" \
+            "term=$keyword" \
+            "main_ver=v1"
+        )"
+        echo -e "$__search"
+    }
 }
-
-# if keyword is empty, search default and hotspot news.
-if [ -z "$keyword" ] ; then
-    # default search.
-    case "$suggestion_type" in
-        hotspot)
-            __hotspot="$( \
-                FEATCH_FROM_API \
-                "$SEARCH_HOTSPOT_API" \
-                ".data.trending.list[].show_name" \
-                "limit=$DEFAULT_HOTSPOT_NUMS"
-            )"
-            echo -e "$__hotspot"
-            ;;
-        *)
-            __default="$( \
-                FEATCH_FROM_API \
-                "$SEARCH_DEFAULT_API" \
-                ".data.show_name"
-            )"
-            echo -e "$__default"
-            ;;
-    esac
-    exit 0
-fi
-
-__search="$( \
-    FEATCH_FROM_API \
-    "$SEARCH_KEYWORD_API" \
-    ".result.tag[].value" \
-    "term=$keyword" \
-    "main_ver=v1"
-)"
-echo -e "$__search"
-exit 0

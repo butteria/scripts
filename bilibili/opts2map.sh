@@ -19,6 +19,7 @@ function opts2map {
                 IFS='=' read key val
         fi
         # delete prefix '--' or '-'.
-        REF_MAP["${key##*-}"]="$val"
+        key="$(echo $key | sed -e 's/^-*//')"
+        REF_MAP["${key}"]="$val"
     done
 }

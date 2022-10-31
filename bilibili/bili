@@ -16,9 +16,15 @@ case $subcmd in
     *)
         # interactive mode using fzf.
         INITIAL_QUERY=""
-        SHELL_COMMAND="./suggestions.sh ${map["type"]} "
-        FZF_DEFAULT_COMMAND="$SHELL_COMMAND '$INITIAL_QUERY'" \
+        SUGGESTIONS_COMMAND="./bili-suggestions $args"
+        SEARCH_COMMAND="./bili-search $args"
+        FZF_DEFAULT_COMMAND="$SUGGESTIONS_COMMAND '$INITIAL_QUERY' | cat -n"\
             fzf --ansi \
-                --bind "change:reload:$SHELL_COMMAND {q} || true" \
-                --disabled --query "$INITIAL_QUERY"
+                --with-nth 2..\
+                --bind "change:reload:$SUGGESTIONS_COMMAND {q} | cat -n || true" \
+                --bind "ctrl-s:reload:$SEARCH_COMMAND \"{}\" | cat -n" \
+                --bind "enter:execute(mpv ~/Music/123木头人.flac)" \
+                --disabled --query "$INITIAL_QUERY" | awk '{print $1}'
+        #\
+        #            | awk '{print $1}')
 esac
