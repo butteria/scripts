@@ -1,4 +1,4 @@
-SUGGESTIONS_DEFAULT_API:https://api.bilibili.com/x/web-interface/search/default
+SUGGESTIONS_DEFAULT_API:https://api.bilibili.com/x/web-interface/search/
 SUGGESTIONS_HOTSPOT_API:https://api.bilibili.com/x/web-interface/search/square
 SUGGESTIONS_KEYWORD_API:https://s.search.bilibili.com/main/suggest
 SEARCH_DEFAULT_API:https://api.bilibili.com/x/web-interface/search/type

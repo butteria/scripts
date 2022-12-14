@@ -68,8 +68,9 @@ function watch_video {
     url=$(echo "$video_info" | jq -r '.data.durl[0].url') 
 
     # download danmu.
-    xml=$(download_danmu "$cid")
-    ass=$(xml2ass "$xml")
+    #xml=$(download_danmu "$cid")
+    #ass=$(xml2ass "$xml")
 
-    mpv --sub-file="$ass" "$url"
+    mpv "$url"
 }
+watch_video $1

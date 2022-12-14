@@ -1,0 +1,49 @@
+#! /bin/sh
+source ./api.sh
+source ./recognize.sh
+source ./opts2map.sh
+declare -A map
+declare -a args=("${@}")
+opts2map args map
+COOKIES="$(fetch_cookies)"
+SEARCH_API="$(cat ./api | grep SEARCH_DEFAULT_API | cut -d ":" -f2,3)"
+
+KEYWORD="${map[0]}"
+PAGE=1
+PAGE_SIZE=20
+SEARCH_TYPE="video"
+if [ -z "$KEYWORD" ] ; then
+    echo "NO KEYWORD GIVEN, EXIT.";
+    exit 0
+fi
+if [ "${map["page"]}" != "true" -a "${map["page"]}" -gt 0 2>/dev/null ] ; then
+    PAGE="${map["page"]}"
+fi
+if [ "${map["page-size"]}" != "true" -a "${map["page-size"]}" -gt 0 2>/dev/null ] ; then
+    PAGE_SIZE="${map["page-size"]}"
+fi
+if [ ! -z "${map["search-type"]}" -a "${map["search-type"]}" != "true" ] ; then
+    SEARCH_TYPE="${map["search-type"]}"
+fi
+
+res_json="$( \
+    FETCH_FROM_API \
+    "$SEARCH_API"\
+    ".data.result[]" \
+    "-b \"SESSDATA=$COOKIES\"" \
+    "--data-urlencode utf8"\
+    "keyword=$KEYWORD" \
+    "page=$PAGE"\
+    "page_size=$PAGE_SIZE" \
+    "search_type=$SEARCH_TYPE"
+)"
+
+# OUTPUT
+if [ "$map["detail"]" == "true" -o "$map["d"]" == "true" ] ; then
+    echo "TODO"
+else
+    echo "$res_json" |\
+        jq -r '.title' |\
+        perl -n -mHTML::Entities -e ' ; print HTML::Entities::decode_entities($_) ;' |\
+        sed 's/<em class="keyword">//g' | sed 's/<\/em>//g'
+fi

@@ -6,6 +6,52 @@ declare -a args=("${@}")
 opts2map args map
 subcmd=${map[0]}
 
+SUGGESTIONS_HOTSPOT_API="$(cat ./api | grep SUGGESTIONS_HOTSPOT_API | cut -d ":" -f2,3)"
+# suggestions.
+function sugg_hotspot()
+{
+    HOTSPOT_NUMS=10
+    if [ ! -z $1 ] ; then
+        HOTSPOT_NUMS=$1
+    fi
+
+    hotspot_json=" \
+    $( \
+        FETCH_FROM_API \
+        "$SUGGESTIONS_HOTSPOT_API" \
+        ".data.trending.list[].show_name" \
+        "NULL" \
+        "limit=$HOTSPOT_NUMS"
+    )"
+    echo -e "\e[34m$hotspot_json\e[0m"
+}
+
+function sugg_default()
+{
+    default_json=" \
+    $( \
+        FETCH_FROM_API \
+        "$SUGGESTIONS_DEFAULT_API" \
+        ".data.show_name" \
+        "NULL"
+    )"
+    echo -e "\e[34m$default_json\e[0m"
+}
+
+function sugg_keyword()
+{
+    keyword_json=" \
+    $( \
+        FETCH_FROM_API \
+        "$SUGGESTIONS_KEYWORD_API" \
+        ".result.tag[].value" \
+        "NULL" \
+        "term=$keyword" \
+        "main_ver=v1"
+    )"
+    echo -e "\e[34m$keyword_json\e[0m"
+}
+
 case $subcmd in
     search)
         ;;
@@ -15,16 +61,15 @@ case $subcmd in
         ;;
     *)
         # interactive mode using fzf.
-        INITIAL_QUERY=""
+        INITIAL_QUERY="123"
         SUGGESTIONS_COMMAND="./bili-suggestions $args"
         SEARCH_COMMAND="./bili-search $args"
-        FZF_DEFAULT_COMMAND="$SUGGESTIONS_COMMAND '$INITIAL_QUERY' | cat -n"\
+        WATCH_COMMAND="./video.sh "
+        FZF_DEFAULT_COMMAND="$SUGGESTIONS_COMMAND --hotspot '$INITIAL_QUERY'"\
             fzf --ansi \
-                --with-nth 2..\
-                --bind "change:reload:$SUGGESTIONS_COMMAND {q} | cat -n || true" \
-                --bind "ctrl-s:reload:$SEARCH_COMMAND \"{}\" | cat -n" \
-                --bind "enter:execute(mpv ~/Music/123木头人.flac)" \
-                --disabled --query "$INITIAL_QUERY" | awk '{print $1}'
-        #\
-        #            | awk '{print $1}')
+                --prompt 'search>' \
+                --header $'\e[4;32mSearch selected entry \e[1;31m(CTRL+S).\e[0m' \
+                --bind "change:reload:$SUGGESTIONS_COMMAND {q} || true" \
+                --bind "ctrl-s:reload:$SEARCH_COMMAND {}" \
+                --disabled --query "$INITIAL_QUERY"
 esac

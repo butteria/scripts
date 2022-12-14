@@ -24,7 +24,7 @@ SUGGESTIONS_KEYWORD_API="$(cat ./api | grep SUGGESTIONS_KEYWORD_API | cut -d ":"
         "NULL" \
         "limit=$HOTSPOT_NUMS"
     )"
-    echo -e "$__hotspot"
+    echo -e "\e[31m$__hotspot\e[0m"
 } || {
     # default suggestions.
     [ -z "$keyword" ] && {
@@ -45,6 +45,6 @@ SUGGESTIONS_KEYWORD_API="$(cat ./api | grep SUGGESTIONS_KEYWORD_API | cut -d ":"
             "term=$keyword" \
             "main_ver=v1"
         )"
-        echo -e "$__search"
+        echo -e "\e[34m$__search\e[0m"
     }
 }
