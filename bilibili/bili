@@ -5,26 +5,31 @@ declare -A map
 declare -a args=("${@}")
 opts2map args map
 subcmd=${map[0]}
+SUGGESTIONS_DEFAULT_API="https://api.bilibili.com/x/web-interface/search/"
+SUGGESTIONS_HOTSPOT_API="https://api.bilibili.com/x/web-interface/search/square"
+SUGGESTIONS_KEYWORD_API="https://s.search.bilibili.com/main/suggest"
+SEARCH_DEFAULT_API="https://api.bilibili.com/x/web-interface/search/type"
 
-SUGGESTIONS_HOTSPOT_API="$(cat ./api | grep SUGGESTIONS_HOTSPOT_API | cut -d ":" -f2,3)"
-# suggestions.
-function sugg_hotspot()
+function curl_api()
 {
-    HOTSPOT_NUMS=10
-    if [ ! -z $1 ] ; then
-        HOTSPOT_NUMS=$1
-    fi
+    curl_cmd="curl -sG $1 -b \"SESSDATA=$(cat ./cookies)\" "
+    for i in "${@:3}"; do
+        curl_cmd="$curl_cmd --data-urlencode \"$i\" "
+    done
 
-    hotspot_json=" \
-    $( \
-        FETCH_FROM_API \
-        "$SUGGESTIONS_HOTSPOT_API" \
-        ".data.trending.list[].show_name" \
-        "NULL" \
-        "limit=$HOTSPOT_NUMS"
-    )"
-    echo -e "\e[34m$hotspot_json\e[0m"
+    result=$(eval $curl_cmd)
+    message="$(echo "$result" | jq '.message')"
+    if [[ "$message" == "0" ]] ; then
+        echo "$0: line ${LINENO[0]}: $message." >&2
+        exit 1
+    fi
+    echo "$result" | jq -r "$2"
 }
+
+#
+PAGE=1
+PAGE_SIZE=20
+SEARCH_TYPE="video"
 
 function sugg_default()
 {
@@ -38,20 +43,6 @@ function sugg_default()
     echo -e "\e[34m$default_json\e[0m"
 }
 
-function sugg_keyword()
-{
-    keyword_json=" \
-    $( \
-        FETCH_FROM_API \
-        "$SUGGESTIONS_KEYWORD_API" \
-        ".result.tag[].value" \
-        "NULL" \
-        "term=$keyword" \
-        "main_ver=v1"
-    )"
-    echo -e "\e[34m$keyword_json\e[0m"
-}
-
 case $subcmd in
     search)
         ;;
@@ -61,15 +52,72 @@ case $subcmd in
         ;;
     *)
         # interactive mode using fzf.
-        INITIAL_QUERY="123"
-        SUGGESTIONS_COMMAND="./bili-suggestions $args"
-        SEARCH_COMMAND="./bili-search $args"
+        INITIAL_QUERY=""
+        SUGGESTIONS_NUMS=15
+        # hotspot suggestions.
+        SUGGESTIONS_HOTSPOT_CMD="\
+            echo \"\e[31m\$(\
+                curl -sG $SUGGESTIONS_HOTSPOT_API\
+                -b \"SESSDATA=$(cat ./cookies)\"\
+                --data-urlencode \"limit=$SUGGESTIONS_NUMS\"\
+                | jq -r '.data.trending.list[].show_name' 2>&1\
+            )\e[0m\"\
+        "
+        # suggestions searched by keywords.
+        SUGGESTIONS_KEYWORD_CMD="\
+            echo \"\e[31m\$(\
+                curl -sG $SUGGESTIONS_KEYWORD_API\
+                -b \"SESSDATA=$(cat ./cookies)\"\
+                --data-urlencode \"term={q}\"\
+                --data-urlencode \"main_ver=v1\"\
+                | jq -r '.result.tag[].value' 2>&1\
+            )\e[0m\"\
+        "
+        # ===== SEARCH =====
+        SEARCH_BY_SUGGESTIONS="\
+            echo \"\e[4m\$(\
+                curl -sG $SEARCH_DEFAULT_API\
+                -b \"SESSDATA=$(cat ./cookies)\"\
+                --data-urlencode \"keyword={}\"\
+                --data-urlencode \"page=$PAGE\"\
+                --data-urlencode \"page_size=$PAGE_SIZE\"\
+                --data-urlencode \"search_type=$SEARCH_TYPE\"\
+                | jq -r '.data.result[].title'\
+                | perl -n -mHTML::Entities -e ' ; print HTML::Entities::decode_entities(\$_) ;'\
+                | sed 's/<em class=\"keyword\">//g' | sed 's/<\/em>//g' 2>&1\
+            )\e[0m\"\
+        "
+        SEARCH_BY_KEYWORD="\
+            echo \"\e[4m\$(\
+                curl -sG $SEARCH_DEFAULT_API\
+                -b \"SESSDATA=$(cat ./cookies)\"\
+                --data-urlencode \"keyword={q}\"\
+                --data-urlencode \"page=$PAGE\"\
+                --data-urlencode \"page_size=$PAGE_SIZE\"\
+                --data-urlencode \"search_type=$SEARCH_TYPE\"\
+                | jq -r '.data.result[].title'\
+                | perl -n -mHTML::Entities -e ' ; print HTML::Entities::decode_entities(\$_) ;'\
+                | sed 's/<em class=\"keyword\">//g' | sed 's/<\/em>//g' 2>&1\
+            )\e[0m\"\
+        "
         WATCH_COMMAND="./video.sh "
-        FZF_DEFAULT_COMMAND="$SUGGESTIONS_COMMAND --hotspot '$INITIAL_QUERY'"\
+                #--bind "enter:reload:[ -z {q} ] && $SEARCH_COMMAND"
+        WATCH_COMMAND="./video.sh "
+                #--bind "enter:reload:[ -z {q} ] && $SEARCH_COMMAND"
+        SEARCHED_PROMPT="searched,select?> "
+        SEARCH_PROMPT="searching?> "
+                #--bind "enter:change-prompt:$SEARCHING_PROMPT+reload:[ -z {q} ] && $SEARCH_COMMAND"\
+        FZF_DEFAULT_COMMAND="$SUGGESTIONS_HOTSPOT_CMD"\
             fzf --ansi \
-                --prompt 'search>' \
-                --header $'\e[4;32mSearch selected entry \e[1;31m(CTRL+S).\e[0m' \
-                --bind "change:reload:$SUGGESTIONS_COMMAND {q} || true" \
-                --bind "ctrl-s:reload:$SEARCH_COMMAND {}" \
-                --disabled --query "$INITIAL_QUERY"
+                --prompt "$SEARCH_PROMPT" \
+                --header-first\
+                --header $'\e[4;32mSearch selected entry \e[1;31m(Enter).\e[0m' \
+                --bind "right:reload:$SEARCH_BY_SUGGESTIONS"\
+                --bind "right:+change-prompt:$SEARCHED_PROMPT"\
+                --bind "left:clear-query+change-prompt:$SEARCH_PROMPT"\
+                --bind "left:+reload:$SUGGESTIONS_HOTSPOT_CMD"\
+                --bind "enter:reload:$SEARCH_BY_KEYWORD"\
+                --bind "enter:+change-prompt:$SEARCHED_PROMPT"\
+                --bind "bs:backward-delete-char+change-prompt:$SEARCH_PROMPT"\
+                --bind "change:reload:sleep 0.1;[ -z {q} ] && $SUGGESTIONS_HOTSPOT_CMD || $SUGGESTIONS_KEYWORD_CMD"
 esac

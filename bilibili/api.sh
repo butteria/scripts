@@ -1,19 +1,20 @@
-function FETCH_FROM_API() {
-    #param:  API, JQ_PARSE_EXPR, [EXTRA_ARGS], args...
-    cmd="curl -H "charset=UTF-8" --data-urlencode utf8 -sG $1 "
-    [[ "$3" != "NULL" ]] && {
-        cmd="$cmd $3"
-    }
-    for i in "${@:4}"; do
-        cmd="$cmd --data-urlencode \"$i\" "
+#! /bin/sh
+
+SUGGESTIONS_DEFAULT_API="https://api.bilibili.com/x/web-interface/search/"
+SUGGESTIONS_HOTSPOT_API="https://api.bilibili.com/x/web-interface/search/square"
+SUGGESTIONS_KEYWORD_API="https://s.search.bilibili.com/main/suggest"
+function curl_api()
+{
+    curl_cmd="curl -sG $1 -b \"SESSDATA=$(cat ./cookies)\" "
+    for i in "${@:3}"; do
+        curl_cmd="$curl_cmd --data-urlencode \"$i\" "
     done
 
-    result="$(eval $cmd)"
-    message="$(printf "%s" "$result" | jq '.message')"
-    [[ "$message" == "0" ]] && {
-        echo "$0: line ${LINENO[0]}: $message." >&2;
+    result=$(eval $curl_cmd)
+    message="$(echo "$result" | jq '.message')"
+    if [[ "$message" == "0" ]] ; then
+        echo "$0: line ${LINENO[0]}: $message." >&2
         exit 1
-    } || {
-        printf "%s" "$(printf "%s" "$result" | jq -r "$2")"
-    }
+    fi
+    echo "$result" | jq -r "$2"
 }
